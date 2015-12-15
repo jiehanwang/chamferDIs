@@ -36,7 +36,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	CChamferDisCal myEndDetect;
 
 	vector<CvPoint> ChamferPath;
+
+	//////////////////////////////////////////////////////////////////////////
+	// The main process of calculating the chamfer distance. 
 	myEndDetect.process(grayImg, ChamferPath);
+	//////////////////////////////////////////////////////////////////////////
 
 	for(vector<CvPoint>::iterator iter = ChamferPath.begin(); iter != ChamferPath.end(); iter++)  
 	{  

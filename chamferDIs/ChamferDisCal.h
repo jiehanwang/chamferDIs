@@ -20,7 +20,7 @@ public:
 
 	bool process(IplImage* inputImg, vector<CvPoint> &ChamferPath);
 	DRect getTheBoundingBox(IplImage* inputImg);
-	bool detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvPoint> &ChamferPath,bool isRight);
+	bool detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvPoint> &ChamferPath);
 	bool IsContourP(int x, int y, IplImage* Src_Img);
 };
 

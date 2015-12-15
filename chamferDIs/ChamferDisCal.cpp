@@ -6,7 +6,6 @@ CChamferDisCal::CChamferDisCal(void)
 {
 }
 
-
 CChamferDisCal::~CChamferDisCal(void)
 {
 }
@@ -106,18 +105,13 @@ DRect CChamferDisCal::getTheBoundingBox(IplImage* inputImg)
 
 bool CChamferDisCal::process(IplImage* inputImg, vector<CvPoint> &ChamferPath)
 {
-	int width = inputImg->width;
-	int height = inputImg->height;
-
 	DRect boundingBox = getTheBoundingBox(inputImg);
-	bool isRight = TRUE;
-	bool isDetect = detectEndPoint_new(inputImg,boundingBox,ChamferPath, isRight);
+	bool isDetect = detectEndPoint_new(inputImg,boundingBox,ChamferPath);
 	
-
 	return isDetect;
 }
 
-bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvPoint> &ChamferPath, bool isRight)
+bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvPoint> &ChamferPath)
 {
 	int xOut, yOut, zOut;
 	int i, j;  // For loop
@@ -144,14 +138,14 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 		}  
 	} while( Remove_Num && loopTime<100); // What is the function of "Remove_Num"?
 
-	// Define the seed point. "isRight" indicates the right or left arm is considered. 
+	// Define the seed point. 
 	int rootX = -1;
 	int rootY = rect.top;
-	int startP = rect.left;
-	int endP = rect.right;
+	int startP = -1;
+	int endP = -1;
 
 	for (i=rect.left; i<rect.right; i++)
-	{
+	{// Find the most lift point
 		double dPixelVal = cvGetReal2D( Src_Img, rect.top, i );
 		if (dPixelVal > 0)
 		{
@@ -160,7 +154,7 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 		}
 	}
 	for (i = rect.right; i>rect.left; i--)
-	{
+	{// Find the most right point
 		double dPixelVal = cvGetReal2D( Src_Img, rect.top, i );
 		if (dPixelVal > 0)
 		{
@@ -168,12 +162,9 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 			break;
 		}
 	}
-	rootX = int((startP + endP)/2);
+	rootX = int((startP + endP)/2); // Select the middle one. 
 	cvCircle(Src_Img,cvPoint(rootX,rootY),10,CV_RGB(255,255,255),2,1,0);
-	if (rootX == -1)
-	{
-		return FALSE;
-	}
+	if (rootX == -1) return FALSE;  // If there is no seed, return false. 
 
 	// Find all the endpoints
 	int endX[1000];
@@ -198,7 +189,7 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 				BYTE gray_value8 = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*(j+1)))[i+1];
 				byte gray = gray_value1+gray_value2+gray_value3+gray_value4+gray_value5+gray_value6
 					+gray_value7+gray_value8;
-				if (gray == 255)
+				if (gray == 255) // The endpoint is defined as the one next to 7 background points. 
 				{
 					endX[count] = i;
 					endY[count] = j;
@@ -206,10 +197,11 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 					count++;
 				}
 			}
-			if (count>100) break;
+			if (count>100) break;   // Limit the cost time by limiting the number of points.  
 		}
 		if (count>100) break;
 	}
+
 	// Choose the farthest endpoint as the final one. 
 	// This method need to be improved.
 	int maxDistance = 0;
@@ -239,6 +231,8 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvP
 
 	ChamferPath.push_back(cvPoint(rootX, rootY));
 	ChamferPath.push_back(cvPoint(xOut, yOut));
+
+
 	// If succeed, return TRUE.
 	return TRUE;
 	
