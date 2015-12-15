@@ -2,9 +2,11 @@
 //
 
 #include "stdafx.h"
+#include <iostream>
 #include <opencv2\opencv.hpp>
 #include "ChamferDisCal.h"
 using namespace cv;
+using namespace std;
 
 void copyImg3to1(IplImage* src, IplImage* des)
 {
@@ -27,18 +29,19 @@ void copyImg3to1(IplImage* src, IplImage* des)
 int _tmain(int argc, _TCHAR* argv[])
 {
 	IplImage* inputImg = cvLoadImage("..\\data\\testImg.jpg", 1);
-	IplImage* grayImg = cvCreateImage(cvSize(inputImg->width, inputImg->height), 8, 1);
+	IplImage* grayImg = cvCreateImage(cvGetSize(inputImg), 8, 1);
+	bool isRight = TRUE; //FALSE TRUE
+
 	copyImg3to1(inputImg, grayImg);
 	CChamferDisCal myEndDetect;
-	DRect rect;
-	rect.left = 0;
-	rect.right = grayImg->width - 1;
-	rect.top = 0;
-	rect.bottom = grayImg->height - 1;
-	int EDp_x = 0;
-	int EDp_y = 0;
-	int EDp_z = 0;
-	myEndDetect.detectEndPoint_new(grayImg,rect, EDp_x, EDp_y, EDp_z, TRUE);
+
+	vector<CvPoint> ChamferPath;
+	myEndDetect.process(grayImg, ChamferPath);
+
+	for(vector<CvPoint>::iterator iter = ChamferPath.begin(); iter != ChamferPath.end(); iter++)  
+	{  
+		cout<<(*iter).x<<" "<<(*iter).y<<endl; 
+	}  
 
 	cvNamedWindow("show", 1);
 	cvShowImage("show", grayImg);

@@ -11,14 +11,121 @@ CChamferDisCal::~CChamferDisCal(void)
 {
 }
 
-bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, 
-									   int& xOut, int& yOut, int& zOut,bool isRight)
+DRect CChamferDisCal::getTheBoundingBox(IplImage* inputImg)
 {
-	int i, j;
+	int x, y;
+	int width = inputImg->width;
+	int height = inputImg->height;
+
+	DRect boundingBox;
+	boundingBox.bottom = 0;
+	boundingBox.top = 0;
+	boundingBox.left = 0;
+	boundingBox.right = 0;
+	int pixelNumThre = 1;
+
+	// The left
+	for (x=0; x<width; x++)
+	{
+		int noZeroCount = 0;
+		for (y=0; y<height; y++)
+		{
+			double dPixelVal = cvGetReal2D( inputImg, y, x );
+			if (dPixelVal >0)
+			{
+				noZeroCount++;
+			}
+		}
+		if (noZeroCount > pixelNumThre)
+		{
+			boundingBox.left = x;
+			break;
+		}
+	}
+
+	// The right
+	for (x=width-1; x>=0; x--)
+	{
+		int noZeroCount = 0;
+		for (y=0; y<height; y++)
+		{
+			double dPixelVal = cvGetReal2D( inputImg, y, x );
+			if (dPixelVal >0)
+			{
+				noZeroCount++;
+			}
+
+		}
+		if (noZeroCount> pixelNumThre)
+		{
+			boundingBox.right = x;
+			break;
+		}
+	}
+
+	// The top
+	for (y=0; y<height; y++)
+	{
+		int noZeroCount = 0;
+		for (x=0; x<width; x++)
+		{
+			double dPixelVal = cvGetReal2D( inputImg, y, x );
+			if (dPixelVal >0)
+			{
+				noZeroCount++;
+			}
+		}
+		if (noZeroCount > pixelNumThre )
+		{
+			boundingBox.top = y;
+			break;
+		}
+
+
+	}
+	for (y=height-1; y>=0; y--)
+	{
+		int noZeroCount = 0;
+		for (x=0; x<width; x++)
+		{
+			double dPixelVal = cvGetReal2D( inputImg, y, x );
+			if (dPixelVal >0)
+			{
+				noZeroCount++;
+			}
+		}
+		if (noZeroCount > pixelNumThre)
+		{
+			boundingBox.bottom = y;
+			break;
+		}
+	}
+	 
+	return boundingBox;
+}
+
+bool CChamferDisCal::process(IplImage* inputImg, vector<CvPoint> &ChamferPath)
+{
+	int width = inputImg->width;
+	int height = inputImg->height;
+
+	DRect boundingBox = getTheBoundingBox(inputImg);
+	bool isRight = TRUE;
+	bool isDetect = detectEndPoint_new(inputImg,boundingBox,ChamferPath, isRight);
+	
+
+	return isDetect;
+}
+
+bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect, vector<CvPoint> &ChamferPath, bool isRight)
+{
+	int xOut, yOut, zOut;
+	int i, j;  // For loop
 	CvSize img_size = cvGetSize(Src_Img);
 	int Remove_Num=0;
-	int loopTime = 0;
-	//extract the bone of arm
+	int loopTime = 0;  // The loop time will be limited to 100. 
+
+	// Extract the bone of arm
 	do 
 	{
 		loopTime+=1;
@@ -35,31 +142,40 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect,
 				}  
 			}  
 		}  
-	} while( Remove_Num && loopTime<100);
-	//define the root point as arm on the left boarder
-	int rootX;
-	if (isRight)
+	} while( Remove_Num && loopTime<100); // What is the function of "Remove_Num"?
+
+	// Define the seed point. "isRight" indicates the right or left arm is considered. 
+	int rootX = -1;
+	int rootY = rect.top;
+	int startP = rect.left;
+	int endP = rect.right;
+
+	for (i=rect.left; i<rect.right; i++)
 	{
-		rootX = rect.left;
-	}
-	else
-	{
-		rootX = rect.right;
-	}
-	int rootY = 0;
-	for (j = rect.top; j < rect.bottom; j++)
-	{
-		BYTE gray_value = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*j))[rootX+1];
-		if (gray_value == 255)
+		double dPixelVal = cvGetReal2D( Src_Img, rect.top, i );
+		if (dPixelVal > 0)
 		{
-			rootY = j;
-			cvCircle(Src_Img,cvPoint(rootX,rootY),5,CV_RGB(255,255,255),2,1,0);
+			startP = i;
 			break;
 		}
 	}
-	// 	rootX = (m_DHRectHuman.left+m_DHRectHuman.right)/2;
-	// 	rootY = m_iDHNeckHeightFinal;
-	//find all the endpoints
+	for (i = rect.right; i>rect.left; i--)
+	{
+		double dPixelVal = cvGetReal2D( Src_Img, rect.top, i );
+		if (dPixelVal > 0)
+		{
+			endP = i;
+			break;
+		}
+	}
+	rootX = int((startP + endP)/2);
+	cvCircle(Src_Img,cvPoint(rootX,rootY),10,CV_RGB(255,255,255),2,1,0);
+	if (rootX == -1)
+	{
+		return FALSE;
+	}
+
+	// Find all the endpoints
 	int endX[1000];
 	int endY[1000];
 	int endLength[100];
@@ -69,8 +185,9 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect,
 		for (i = rect.left+5; i < rect.right-5; i++)
 		{
 			BYTE gray_value = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*(j)))[i];
-			if (gray_value == 255)
+			if (gray_value > 250)
 			{
+				// The 8 directions. 
 				BYTE gray_value1 = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*(j-1)))[i-1];
 				BYTE gray_value2 = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*j))[i-1];
 				BYTE gray_value3 = ((BYTE*)(Src_Img->imageData + Src_Img->widthStep*(j+1)))[i-1];
@@ -89,17 +206,12 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect,
 					count++;
 				}
 			}
-			if (count>100)
-			{
-				break;
-			}
+			if (count>100) break;
 		}
-		if (count>100)
-		{
-			break;
-		}
+		if (count>100) break;
 	}
-	//choose the farthest endpoint as the final one. this method need to be improved.
+	// Choose the farthest endpoint as the final one. 
+	// This method need to be improved.
 	int maxDistance = 0;
 	for (i=0; i<count; i++)
 	{
@@ -120,17 +232,16 @@ bool CChamferDisCal::detectEndPoint_new(IplImage* Src_Img,DRect rect,
 	// 		m_iDHPreviousEdp.x = xOut;
 	// 		m_iDHPreviousEdp.y = yOut;
 	// 	}
-	cvCircle(Src_Img,cvPoint(xOut,yOut),5,CV_RGB(255,255,255),2,1,0);
+	cvCircle(Src_Img,cvPoint(xOut,yOut),10,CV_RGB(255,255,255),2,1,0);
+	// Set zOut to 0 temporally. 
 	zOut = 0; // *(m_pDHFrameBits+m_iWidth*yOut+xOut);
-	//return the flag whether there are endpoint in bounding box.
-	if (rootY == 0)
-	{
-		return FALSE;
-	}
-	else
-	{
-		return TRUE;
-	}
+
+
+	ChamferPath.push_back(cvPoint(rootX, rootY));
+	ChamferPath.push_back(cvPoint(xOut, yOut));
+	// If succeed, return TRUE.
+	return TRUE;
+	
 }
 
 
